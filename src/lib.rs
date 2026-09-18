@@ -21,10 +21,19 @@
 //! What this reads and writes:
 //!
 //! ```text
-//! http.header.authorization   Bearer <token>        the property, by default
-//! jwt.issuer                  the iss claim         evidence
-//! jwt.token                   the compact token     proof
+//! http.header.authorization   Bearer <token>            the property, by default
+//! jwt.issuer                  the iss claim             evidence
+//! principal.user              upn, preferred_username   evidence, where it is one
+//! principal.service           azp, appid                evidence, where it is one
+//! jwt.token                   the compact token         proof
 //! ```
+//!
+//! Principal evidence, in the capability's canonical form (ADR-0054): the
+//! `upn` claim, else `preferred_username`, where it is a user principal name;
+//! and for an application's token — `idtyp` is `app`, or neither of those
+//! claims is there and `azp` or `appid` is — the application's identifier
+//! where it is a service principal name. An opaque identifier is not one, and
+//! nothing is added for it. The claim's value does not change.
 //!
 //! Only a pushed arrival carries a passed claim; where Xmip fetched the
 //! Stream the token in play was Xmip's own.
@@ -109,6 +118,9 @@ impl Jwt {
         if let Some(issuer) = compact.claim("iss") {
             claim = claim.with_evidence(ISSUER, issuer);
         }
+        if let Some(name) = compact.principal() {
+            claim = claim.with_evidence(name.evidence(), name.to_string());
+        }
         Ok(claim.with_proof(TOKEN_PROOF, token))
     }
 }
@@ -179,6 +191,7 @@ mod tests {
     use base64::Engine;
     use base64::engine::general_purpose::URL_SAFE_NO_PAD;
     use context::MessageContext;
+    use identify::principal;
     use message::{MessageSection, MessageTreatment};
     use stream::Stream;
     use xcore::{Established, Layer, MessageId, SectionId, StreamId};
@@ -312,6 +325,69 @@ mod tests {
         .expect("a claim");
 
         assert_eq!(claim.value, "orders-client");
+    }
+
+    fn presented(claims: &str) -> Presented {
+        let stream = stream();
+        let properties = authorization(&format!("Bearer {}", token(claims)));
+        let arrival = StreamArrival::new(&stream, Arriving::Pushed, "https://x/in", &properties);
+
+        TransportIdentifier::identify(&Jwt::bearer(), &arrival)
+            .expect("read")
+            .expect("a claim")
+    }
+
+    fn principals(claim: &Presented) -> Vec<(&str, &str)> {
+        claim
+            .evidence
+            .iter()
+            .filter(|(name, _)| name.starts_with("principal."))
+            .map(|(name, value)| (name.as_str(), value.as_str()))
+            .collect()
+    }
+
+    #[test]
+    fn a_users_principal_name_is_written_beside_the_subject_in_canonical_form() {
+        let claim = presented(r#"{"sub":"u-17","upn":"Jane@Partner-X.Example"}"#);
+        assert_eq!(claim.value, "u-17", "the value stays the subject");
+        assert_eq!(
+            principals(&claim),
+            [(principal::USER, "Jane@partner-x.example")]
+        );
+
+        let claim = presented(r#"{"sub":"u-17","preferred_username":"PARTNERX\\jane"}"#);
+        assert_eq!(principals(&claim), [(principal::USER, "jane@partnerx")]);
+    }
+
+    #[test]
+    fn an_applications_token_names_a_service_only_where_its_identifier_is_one() {
+        let claim = presented(concat!(
+            r#"{"sub":"a-1","idtyp":"app","upn":"jane@partner-x.example","#,
+            r#""azp":"HTTP/Orders.Example@EXAMPLE.COM"}"#,
+        ));
+        assert_eq!(
+            principals(&claim),
+            [(principal::SERVICE, "HTTP/orders.example@example.com")]
+        );
+
+        let claim = presented(r#"{"sub":"a-1","appid":"MSSQLSvc/DB01.Example:1433"}"#);
+        assert_eq!(
+            principals(&claim),
+            [(principal::SERVICE, "MSSQLSvc/db01.example:1433")]
+        );
+    }
+
+    #[test]
+    fn text_that_is_not_a_principal_name_gains_no_principal_evidence() {
+        for claims in [
+            r#"{"sub":"u-17","preferred_username":"jane"}"#,
+            r#"{"sub":"a-1","idtyp":"app","appid":"6f1c2a9e-3b7d-4c55-9e0a-2d1f8b7c4e11"}"#,
+            r#"{"sub":"a-1","azp":"api://orders"}"#,
+            r#"{"sub":"u-17","preferred_username":"jane","azp":"HTTP/orders.example"}"#,
+            r#"{"sub":"jane@partner-x.example"}"#,
+        ] {
+            assert!(principals(&presented(claims)).is_empty(), "{claims}");
+        }
     }
 
     #[test]
