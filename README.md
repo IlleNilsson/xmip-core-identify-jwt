@@ -1,12 +1,6 @@
 # xmip-core-identify-jwt
 
-Identify by jwt: reads a bearer token's subject, unverified; an identifier at the transport and message layers whose claim is passed. A technology of
-[xmip-core-identify](https://github.com/IlleNilsson/xmip-core-identify).
-
-Declared and not yet written; `architecture.toml` carries the maturity. When
-it is written it implements `TransportIdentifier` and `MessageIdentifier`, one mechanism at one gate (ADR-0050).
-What it may depend on is `repository-model.md` section 4 and ADR-0044: its
-capability, and no sibling.
+Identify by jwt: reads a bearer token's subject, unverified, from the connection or from the content, with the token riding as proof for the second gate. A technology of [xmip-core-identify](https://github.com/IlleNilsson/xmip-core-identify).
 
 ## Toolchain
 
