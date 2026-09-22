@@ -38,7 +38,7 @@
 //! Only a pushed arrival carries a passed claim; where Xmip fetched the
 //! Stream the token in play was Xmip's own.
 
-use identify::jwt::Compact;
+use identify::jwt::{self, Compact};
 use identify::{IdentifyError, MessageIdentifier, Presented, StreamArrival, TransportIdentifier};
 use message::Message;
 use xcore::{Arriving, Mechanism};
@@ -91,18 +91,7 @@ impl Jwt {
 
     /// The token the property carries, where it carries one under the scheme.
     fn token<'a>(&self, raw: &'a str) -> Option<&'a str> {
-        let raw = raw.trim();
-        let token = match &self.scheme {
-            Some(scheme) => {
-                let (found, rest) = raw.split_once(char::is_whitespace)?;
-                if !found.eq_ignore_ascii_case(scheme) {
-                    return None;
-                }
-                rest.trim()
-            }
-            None => raw,
-        };
-        is_compact(token).then_some(token)
+        jwt::carried(raw, self.scheme.as_deref())
     }
 
     fn present(&self, token: &str) -> Result<Presented, IdentifyError> {
@@ -123,12 +112,6 @@ impl Jwt {
         }
         Ok(claim.with_proof(TOKEN_PROOF, token))
     }
-}
-
-/// Three parts around two dots and no whitespace: the shape RFC 7515 gives a
-/// compact serialization, and the test that tells a JWT from an opaque token.
-fn is_compact(token: &str) -> bool {
-    token.split('.').count() == 3 && !token.contains(char::is_whitespace) && !token.is_empty()
 }
 
 impl TransportIdentifier for Jwt {
@@ -172,7 +155,7 @@ impl MessageIdentifier for Jwt {
                 Ok(None)
             };
         };
-        if !is_compact(text) {
+        if !jwt::is_compact(text) {
             return if declared {
                 Err(IdentifyError::new(
                     "the application/jwt section is not a compact token",
