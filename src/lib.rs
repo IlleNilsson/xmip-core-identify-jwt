@@ -38,13 +38,12 @@
 //! Only a pushed arrival carries a passed claim; where Xmip fetched the
 //! Stream the token in play was Xmip's own.
 
+use identify::authorization::AUTHORIZATION;
 use identify::jwt::{self, Compact};
 use identify::{IdentifyError, MessageIdentifier, Presented, StreamArrival, TransportIdentifier};
 use message::Message;
 use xcore::{Arriving, Mechanism};
 
-/// The property read by default: the HTTP `Authorization` header.
-pub const AUTHORIZATION: &str = "http.header.authorization";
 /// The media type of a section that is a token.
 pub const MEDIA_TYPE: &str = "application/jwt";
 /// The evidence name carrying the issuer.
