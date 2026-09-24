@@ -39,6 +39,7 @@
 //! Stream the token in play was Xmip's own.
 
 use identify::authorization::AUTHORIZATION;
+use identify::evidence;
 use identify::jwt::{self, Compact};
 use identify::{IdentifyError, MessageIdentifier, Presented, StreamArrival, TransportIdentifier};
 use message::Message;
@@ -48,8 +49,6 @@ use xcore::{Arriving, Mechanism};
 pub const MEDIA_TYPE: &str = "application/jwt";
 /// The evidence name carrying the issuer.
 pub const ISSUER: &str = "jwt.issuer";
-/// The proof name the compact token rides under.
-pub const TOKEN_PROOF: &str = "jwt.token";
 
 /// Reads a token's subject, from a header or from the content.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -109,7 +108,7 @@ impl Jwt {
         if let Some(name) = compact.principal() {
             claim = claim.with_evidence(name.evidence(), name.to_string());
         }
-        Ok(claim.with_proof(TOKEN_PROOF, token))
+        Ok(claim.with_proof(evidence::JWT_TOKEN, token))
     }
 }
 
@@ -170,10 +169,7 @@ impl MessageIdentifier for Jwt {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use base64::Engine;
-    use base64::engine::general_purpose::URL_SAFE_NO_PAD;
     use context::MessageContext;
-    use identify::principal;
     use message::{MessageSection, MessageTreatment};
     use stream::Stream;
     use xcore::{Established, Layer, MessageId, SectionId, StreamId};
@@ -181,9 +177,9 @@ mod tests {
     fn token(claims: &str) -> String {
         format!(
             "{}.{}.{}",
-            URL_SAFE_NO_PAD.encode(r#"{"alg":"HS256"}"#),
-            URL_SAFE_NO_PAD.encode(claims),
-            URL_SAFE_NO_PAD.encode(b"signature")
+            codec::base64::encode_url_unpadded(r#"{"alg":"HS256"}"#.as_bytes()),
+            codec::base64::encode_url_unpadded(claims.as_bytes()),
+            codec::base64::encode_url_unpadded(b"signature")
         )
     }
 
@@ -232,7 +228,7 @@ mod tests {
             claim.evidence,
             vec![(ISSUER.to_string(), "https://idp.example".to_string())]
         );
-        assert_eq!(claim.proof(TOKEN_PROOF), Some(minted.as_str()));
+        assert_eq!(claim.proof(evidence::JWT_TOKEN), Some(minted.as_str()));
     }
 
     #[test]
@@ -334,11 +330,14 @@ mod tests {
         assert_eq!(claim.value, "u-17", "the value stays the subject");
         assert_eq!(
             principals(&claim),
-            [(principal::USER, "Jane@partner-x.example")]
+            [(evidence::PRINCIPAL_USER, "Jane@partner-x.example")]
         );
 
         let claim = presented(r#"{"sub":"u-17","preferred_username":"PARTNERX\\jane"}"#);
-        assert_eq!(principals(&claim), [(principal::USER, "jane@partnerx")]);
+        assert_eq!(
+            principals(&claim),
+            [(evidence::PRINCIPAL_USER, "jane@partnerx")]
+        );
     }
 
     #[test]
@@ -349,13 +348,16 @@ mod tests {
         ));
         assert_eq!(
             principals(&claim),
-            [(principal::SERVICE, "HTTP/orders.example@example.com")]
+            [(
+                evidence::PRINCIPAL_SERVICE,
+                "HTTP/orders.example@example.com"
+            )]
         );
 
         let claim = presented(r#"{"sub":"a-1","appid":"MSSQLSvc/DB01.Example:1433"}"#);
         assert_eq!(
             principals(&claim),
-            [(principal::SERVICE, "MSSQLSvc/db01.example:1433")]
+            [(evidence::PRINCIPAL_SERVICE, "MSSQLSvc/db01.example:1433")]
         );
     }
 
@@ -384,7 +386,7 @@ mod tests {
         .expect("a claim");
 
         assert_eq!(claim.value, "partner-x");
-        assert_eq!(claim.proof(TOKEN_PROOF), Some(minted.as_str()));
+        assert_eq!(claim.proof(evidence::JWT_TOKEN), Some(minted.as_str()));
     }
 
     #[test]
