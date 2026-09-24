@@ -38,7 +38,7 @@
 //! Only a pushed arrival carries a passed claim; where Xmip fetched the
 //! Stream the token in play was Xmip's own.
 
-use identify::authorization::AUTHORIZATION;
+use context::property::HTTP_AUTHORIZATION;
 use identify::evidence;
 use identify::jwt::{self, Compact};
 use identify::{IdentifyError, MessageIdentifier, Presented, StreamArrival, TransportIdentifier};
@@ -63,7 +63,7 @@ impl Jwt {
     #[must_use]
     pub fn bearer() -> Self {
         Self {
-            property: AUTHORIZATION.to_string(),
+            property: HTTP_AUTHORIZATION.to_string(),
             scheme: Some("Bearer".to_string()),
             claim: "sub".to_string(),
         }
@@ -188,7 +188,7 @@ mod tests {
     }
 
     fn authorization(value: &str) -> Vec<(String, String)> {
-        vec![(AUTHORIZATION.to_string(), value.to_string())]
+        vec![(HTTP_AUTHORIZATION.to_string(), value.to_string())]
     }
 
     fn message(bytes: &[u8], media_type: Option<&str>) -> Message {
