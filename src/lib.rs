@@ -209,7 +209,7 @@ mod tests {
     #[test]
     fn a_bearer_token_is_presented_by_its_subject_with_the_issuer_beside_and_the_token_as_proof() {
         let stream = stream();
-        let minted = token(r#"{"iss":"https://idp.example","sub":"partner-x","exp":1}"#);
+        let minted = token(r#"{"iss":"https://idp.example","sub":"party-x","exp":1}"#);
         let properties = authorization(&format!("bearer {minted}"));
         let arrival = StreamArrival::new(&stream, Arriving::Pushed, "https://x/in", &properties);
 
@@ -217,7 +217,7 @@ mod tests {
             .expect("read")
             .expect("a claim");
 
-        assert_eq!(claim.value, "partner-x");
+        assert_eq!(claim.value, "party-x");
         assert_eq!(claim.established, Established::Passed);
         assert_eq!(claim.layer(), Layer::Transport);
         assert_eq!(claim.mechanism.name(), "jwt");
@@ -231,10 +231,7 @@ mod tests {
     #[test]
     fn an_opaque_bearer_token_and_another_scheme_present_nothing() {
         let stream = stream();
-        for value in [
-            "Bearer 2YotnFZFEjr1zCsicMWpAA",
-            "Basic cGFydG5lcjpzZWNyZXQ=",
-        ] {
+        for value in ["Bearer 2YotnFZFEjr1zCsicMWpAA", "Basic cGFydHk6c2VjcmV0"] {
             let properties = authorization(value);
             let arrival =
                 StreamArrival::new(&stream, Arriving::Pushed, "https://x/in", &properties);
@@ -288,7 +285,7 @@ mod tests {
     #[test]
     fn a_configured_property_carries_the_bare_token_under_a_configured_claim() {
         let stream = stream();
-        let minted = token(r#"{"sub":"partner-x","azp":"orders-client"}"#);
+        let minted = token(r#"{"sub":"party-x","azp":"orders-client"}"#);
         let properties = [("http.header.x-id-token".to_string(), minted)];
         let arrival = StreamArrival::new(&stream, Arriving::Pushed, "https://x/in", &properties);
 
@@ -323,24 +320,24 @@ mod tests {
 
     #[test]
     fn a_users_principal_name_is_written_beside_the_subject_in_canonical_form() {
-        let claim = presented(r#"{"sub":"u-17","upn":"Jane@Partner-X.Example"}"#);
+        let claim = presented(r#"{"sub":"u-17","upn":"Jane@Party-X.Example"}"#);
         assert_eq!(claim.value, "u-17", "the value stays the subject");
         assert_eq!(
             principals(&claim),
-            [(evidence::PRINCIPAL_USER, "Jane@partner-x.example")]
+            [(evidence::PRINCIPAL_USER, "Jane@party-x.example")]
         );
 
-        let claim = presented(r#"{"sub":"u-17","preferred_username":"PARTNERX\\jane"}"#);
+        let claim = presented(r#"{"sub":"u-17","preferred_username":"PARTYX\\jane"}"#);
         assert_eq!(
             principals(&claim),
-            [(evidence::PRINCIPAL_USER, "jane@partnerx")]
+            [(evidence::PRINCIPAL_USER, "jane@partyx")]
         );
     }
 
     #[test]
     fn an_applications_token_names_a_service_only_where_its_identifier_is_one() {
         let claim = presented(concat!(
-            r#"{"sub":"a-1","idtyp":"app","upn":"jane@partner-x.example","#,
+            r#"{"sub":"a-1","idtyp":"app","upn":"jane@party-x.example","#,
             r#""azp":"HTTP/Orders.Example@EXAMPLE.COM"}"#,
         ));
         assert_eq!(
@@ -365,7 +362,7 @@ mod tests {
             r#"{"sub":"a-1","idtyp":"app","appid":"6f1c2a9e-3b7d-4c55-9e0a-2d1f8b7c4e11"}"#,
             r#"{"sub":"a-1","azp":"api://orders"}"#,
             r#"{"sub":"u-17","preferred_username":"jane","azp":"HTTP/orders.example"}"#,
-            r#"{"sub":"jane@partner-x.example"}"#,
+            r#"{"sub":"jane@party-x.example"}"#,
         ] {
             assert!(principals(&presented(claims)).is_empty(), "{claims}");
         }
@@ -373,7 +370,7 @@ mod tests {
 
     #[test]
     fn a_section_that_is_a_token_is_read_on_the_message_layer() {
-        let minted = token(r#"{"sub":"partner-x"}"#);
+        let minted = token(r#"{"sub":"party-x"}"#);
 
         let claim = MessageIdentifier::identify(
             &Jwt::bearer(),
@@ -382,7 +379,7 @@ mod tests {
         .expect("read")
         .expect("a claim");
 
-        assert_eq!(claim.value, "partner-x");
+        assert_eq!(claim.value, "party-x");
         assert_eq!(claim.proof(evidence::JWT_TOKEN), Some(minted.as_str()));
     }
 
