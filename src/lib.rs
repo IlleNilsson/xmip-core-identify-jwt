@@ -180,10 +180,6 @@ mod tests {
         )
     }
 
-    fn stream() -> Stream {
-        Stream::new(StreamId::new(1), b"<order/>".to_vec(), None)
-    }
-
     fn authorization(value: &str) -> Vec<(String, String)> {
         vec![(HTTP_AUTHORIZATION.to_string(), value.to_string())]
     }
@@ -208,10 +204,9 @@ mod tests {
 
     #[test]
     fn a_bearer_token_is_presented_by_its_subject_with_the_issuer_beside_and_the_token_as_proof() {
-        let stream = stream();
         let minted = token(r#"{"iss":"https://idp.example","sub":"party-x","exp":1}"#);
         let properties = authorization(&format!("bearer {minted}"));
-        let arrival = StreamArrival::new(&stream, Arriving::Pushed, "https://x/in", &properties);
+        let arrival = StreamArrival::new(Arriving::Pushed, "https://x/in", &properties);
 
         let claim = TransportIdentifier::identify(&Jwt::bearer(), &arrival)
             .expect("read")
@@ -230,11 +225,9 @@ mod tests {
 
     #[test]
     fn an_opaque_bearer_token_and_another_scheme_present_nothing() {
-        let stream = stream();
         for value in ["Bearer 2YotnFZFEjr1zCsicMWpAA", "Basic cGFydHk6c2VjcmV0"] {
             let properties = authorization(value);
-            let arrival =
-                StreamArrival::new(&stream, Arriving::Pushed, "https://x/in", &properties);
+            let arrival = StreamArrival::new(Arriving::Pushed, "https://x/in", &properties);
 
             assert!(
                 TransportIdentifier::identify(&Jwt::bearer(), &arrival)
@@ -247,8 +240,7 @@ mod tests {
 
     #[test]
     fn an_arrival_without_the_header_presents_nothing() {
-        let stream = stream();
-        let arrival = StreamArrival::new(&stream, Arriving::Pushed, "https://x/in", &[]);
+        let arrival = StreamArrival::new(Arriving::Pushed, "https://x/in", &[]);
 
         assert!(
             TransportIdentifier::identify(&Jwt::bearer(), &arrival)
@@ -259,9 +251,8 @@ mod tests {
 
     #[test]
     fn a_token_that_does_not_decode_is_an_error_naming_why() {
-        let stream = stream();
         let properties = authorization("Bearer e30.b!!.aQ");
-        let arrival = StreamArrival::new(&stream, Arriving::Pushed, "https://x/in", &properties);
+        let arrival = StreamArrival::new(Arriving::Pushed, "https://x/in", &properties);
 
         let failure =
             TransportIdentifier::identify(&Jwt::bearer(), &arrival).expect_err("not base64url");
@@ -271,10 +262,9 @@ mod tests {
 
     #[test]
     fn a_token_without_the_claim_is_an_error_naming_the_claim() {
-        let stream = stream();
         let minted = token(r#"{"iss":"https://idp.example"}"#);
         let properties = authorization(&format!("Bearer {minted}"));
-        let arrival = StreamArrival::new(&stream, Arriving::Pushed, "https://x/in", &properties);
+        let arrival = StreamArrival::new(Arriving::Pushed, "https://x/in", &properties);
 
         let failure = TransportIdentifier::identify(&Jwt::bearer().claiming("client_id"), &arrival)
             .expect_err("no claim");
@@ -284,10 +274,9 @@ mod tests {
 
     #[test]
     fn a_configured_property_carries_the_bare_token_under_a_configured_claim() {
-        let stream = stream();
         let minted = token(r#"{"sub":"party-x","azp":"orders-client"}"#);
         let properties = [("http.header.x-id-token".to_string(), minted)];
-        let arrival = StreamArrival::new(&stream, Arriving::Pushed, "https://x/in", &properties);
+        let arrival = StreamArrival::new(Arriving::Pushed, "https://x/in", &properties);
 
         let claim = TransportIdentifier::identify(
             &Jwt::in_property("http.header.x-id-token").claiming("azp"),
@@ -300,9 +289,8 @@ mod tests {
     }
 
     fn presented(claims: &str) -> Presented {
-        let stream = stream();
         let properties = authorization(&format!("Bearer {}", token(claims)));
-        let arrival = StreamArrival::new(&stream, Arriving::Pushed, "https://x/in", &properties);
+        let arrival = StreamArrival::new(Arriving::Pushed, "https://x/in", &properties);
 
         TransportIdentifier::identify(&Jwt::bearer(), &arrival)
             .expect("read")
@@ -400,10 +388,8 @@ mod tests {
 
     #[test]
     fn a_scheduled_pickup_presents_nothing_because_the_token_was_xmips_own() {
-        let stream = stream();
         let properties = authorization(&format!("Bearer {}", token(r#"{"sub":"xmip"}"#)));
-        let arrival =
-            StreamArrival::new(&stream, Arriving::Scheduled, "https://api/out", &properties);
+        let arrival = StreamArrival::new(Arriving::Scheduled, "https://api/out", &properties);
 
         assert!(
             TransportIdentifier::identify(&Jwt::bearer(), &arrival)
