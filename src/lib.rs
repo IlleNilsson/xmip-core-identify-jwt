@@ -141,7 +141,7 @@ impl MessageIdentifier for Jwt {
             return Ok(None);
         };
         let declared = section.stream.media_type() == Some(MEDIA_TYPE);
-        let Some(text) = section.stream.text().ok().map(str::trim) else {
+        let Some(text) = identify::text(&section.stream)?.map(str::trim) else {
             return if declared {
                 Err(IdentifyError::new(
                     "the application/jwt section is not text",
