@@ -40,8 +40,9 @@
 
 use context::property::HTTP_AUTHORIZATION;
 use identify::evidence;
-use identify::jwt::{self, Compact};
+use identify::jwt;
 use identify::{IdentifyError, MessageIdentifier, Presented, StreamArrival, TransportIdentifier};
+use jose::jwt::Token;
 use message::Message;
 use xcore::{Arriving, Mechanism};
 
@@ -93,8 +94,8 @@ impl Jwt {
     }
 
     fn present(&self, token: &str) -> Result<Presented, IdentifyError> {
-        let compact = Compact::parse(token)?;
-        let Some(value) = compact.claim(&self.claim) else {
+        let read = Token::read(token)?;
+        let Some(value) = read.claim(&self.claim) else {
             return Err(IdentifyError::new(format!(
                 "the token carries no `{}` claim",
                 self.claim
@@ -102,10 +103,10 @@ impl Jwt {
         };
 
         let mut claim = Presented::passed(TransportIdentifier::mechanism(self), value);
-        if let Some(issuer) = compact.claim("iss") {
+        if let Some(issuer) = read.issuer() {
             claim = claim.with_evidence(ISSUER, issuer);
         }
-        if let Some(name) = compact.principal() {
+        if let Some(name) = jwt::principal(&read) {
             claim = claim.with_evidence(name.evidence(), name.to_string());
         }
         Ok(claim.with_proof(evidence::JWT_TOKEN, token))
@@ -150,7 +151,7 @@ impl MessageIdentifier for Jwt {
                 Ok(None)
             };
         };
-        if !jwt::is_compact(text) {
+        if !jose::jws::is_compact(text) {
             return if declared {
                 Err(IdentifyError::new(
                     "the application/jwt section is not a compact token",

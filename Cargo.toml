@@ -15,10 +15,14 @@ path = "src/lib.rs"
 
 [dependencies]
 # A Technology depends on its parent Capability, never the reverse
-# (repository-model.md). The compact token reader is the capability's
-# (identify::jwt, ADR-0044); the mechanism is xmip-core's; the Message is the
-# Foundation's, for the message layer this mechanism also travels on.
+# (repository-model.md). The token a property carries and the principal its
+# claims name are the capability's (identify::jwt, ADR-0044); the mechanism
+# is xmip-core's; the Message is the Foundation's, for the message layer this
+# mechanism also travels on.
 identify = { package = "xmip-core-identify", git = "https://github.com/IlleNilsson/xmip-core-identify", branch = "main" }
+# The token itself, read as the estate's one JOSE reads it (jose::jwt), the
+# same read the second gate verifies.
+jose = { package = "xmip-core-library-jose", git = "https://github.com/IlleNilsson/xmip-core-library-jose", branch = "main" }
 xcore = { package = "xmip-core", git = "https://github.com/IlleNilsson/xmip-core", branch = "main" }
 message = { package = "xmip-core-message", git = "https://github.com/IlleNilsson/xmip-core-message", branch = "main" }
 # The names the transport writes on the arrival (context::property), and
